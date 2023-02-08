@@ -1,6 +1,7 @@
 import {BatchHandlerContext, BatchProcessorItem, EvmBatchProcessor, EvmBlock} from '@subsquid/evm-processor'
 import {LogItem} from '@subsquid/evm-processor/lib/interfaces/dataSelection'
 import {Store, TypeormDatabase} from '@subsquid/typeorm-store'
+import { lookupArchive } from '@subsquid/archive-registry'
 import {In} from 'typeorm'
 import {Account, Transfer} from './model'
 
@@ -8,7 +9,7 @@ import * as erc20 from './abi/erc20'
 
 const processor = new EvmBatchProcessor()
     .setDataSource({
-        archive: 'https://eth.archive.subsquid.io',
+        archive: lookupArchive('eth-mainnet'),
     })
     .addLog('0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48', {
         range: {from: 6_082_465},
