@@ -1,3 +1,5 @@
+[![Open in Gitpod](https://gitpod.io/button/open-in-gitpod.svg)](https://gitpod.io/#https://github.com/subsquid-labs/evm-logs-example)
+
 # USDC transfers indexing squid
 
 This example squid indexes USDC transfers by tracking the historical `Transfer(address,address,uint256)` logs emitted by the [USDC contract](https://etherscan.io/address/0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48) on the Ethereum Mainnet. 
