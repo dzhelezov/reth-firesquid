@@ -2,8 +2,8 @@ import {Entity as Entity_, Column as Column_, PrimaryColumn as PrimaryColumn_} f
 import * as marshal from "./marshal"
 
 @Entity_()
-export class Transfer {
-    constructor(props?: Partial<Transfer>) {
+export class Approval {
+    constructor(props?: Partial<Approval>) {
         Object.assign(this, props)
     }
 
@@ -11,11 +11,11 @@ export class Transfer {
     id!: string
 
     @Column_("text", {nullable: false})
-    spender!: string
+    owner!: string
 
     @Column_("text", {nullable: false})
-    receiver!: string
+    spender!: string
 
     @Column_("numeric", {transformer: marshal.bigintTransformer, nullable: false})
-    amount!: bigint
+    value!: bigint
 }

@@ -1,118 +1,80 @@
-import {BatchHandlerContext, BatchProcessorItem, EvmBatchProcessor, EvmBlock} from '@subsquid/evm-processor'
-import {LogItem} from '@subsquid/evm-processor/lib/interfaces/dataSelection'
+import {BatchHandlerContext, BatchProcessorItem, EvmBatchProcessor, EvmBlock, LogItem} from '@subsquid/evm-processor'
 import {Store, TypeormDatabase} from '@subsquid/typeorm-store'
 import { lookupArchive } from '@subsquid/archive-registry'
-import {In} from 'typeorm'
-import {Account, Transfer} from './model'
-
+import {Approval, Transfer} from './model'
+import assert from 'assert'
 import * as erc20 from './abi/erc20'
+
+export const CONTRACT_ADDRESS = '0xae78736cd615f374d3085123a210448e74fc6393'
 
 const processor = new EvmBatchProcessor()
     .setDataSource({
         archive: lookupArchive('eth-mainnet'),
     })
-    .addLog('0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48', {
-        range: {from: 6_082_465},
-        filter: [[erc20.events.Transfer.topic]],
+    .addLog(CONTRACT_ADDRESS, {
+        range: {from: 11_446_767, to: 17_576_926},
+        filter: [[erc20.events.Transfer.topic, erc20.events.Approval.topic]],
         data: {
             evmLog: {
                 topics: true,
                 data: true,
-            },
-            transaction: {
-                hash: true,
-            },
+            }
         },
     })
 
 type Item = BatchProcessorItem<typeof processor>
 type Ctx = BatchHandlerContext<Store, Item>
 
+
+
 processor.run(new TypeormDatabase(), async (ctx) => {
-    let transfersData: TransferEventData[] = []
-
+    let transfers: Transfer[] = []
+    let approvals: Approval[] = []
     for (let block of ctx.blocks) {
-        for (let item of block.items) {
-            if (item.kind !== 'evmLog') continue
-
-            if (item.evmLog.topics[0] === erc20.events.Transfer.topic) {
-                transfersData.push(handleTransfer(ctx, block.header, item))
+        for (let log of block.items) {
+            assert(log.kind == 'evmLog')
+            if (log.address === CONTRACT_ADDRESS && log.evmLog.topics[0] === erc20.events.Transfer.topic) {
+                transfers.push(getTransfer(log))
+            }
+            if (log.address === CONTRACT_ADDRESS && log.evmLog.topics[0] === erc20.events.Approval.topic) {
+                approvals.push(getApproval(log))
             }
         }
     }
-
-    await saveTransfers(ctx, transfersData)
+    await ctx.store.insert(transfers)
+    await ctx.store.insert(approvals)
 })
 
-async function saveTransfers(ctx: Ctx, transfersData: TransferEventData[]) {
-    let accountIds = new Set<string>()
-    for (let t of transfersData) {
-        accountIds.add(t.from)
-        accountIds.add(t.to)
-    }
-
-    let accounts = await ctx.store
-        .findBy(Account, {id: In([...accountIds])})
-        .then((q) => new Map(q.map((i) => [i.id, i])))
-
-    let transfers: Transfer[] = []
-
-    for (let t of transfersData) {
-        let {id, blockNumber, timestamp, txHash, amount} = t
-
-        let from = getAccount(accounts, t.from)
-        let to = getAccount(accounts, t.to)
-
-        transfers.push(
-            new Transfer({
-                id,
-                blockNumber,
-                timestamp,
-                txHash,
-                from,
-                to,
-                amount,
-            })
-        )
-    }
-
-    await ctx.store.save(Array.from(accounts.values()))
-    await ctx.store.insert(transfers)
-}
-
-interface TransferEventData {
-    id: string
-    blockNumber: number
-    timestamp: Date
-    txHash: string
-    from: string
-    to: string
-    amount: bigint
-}
-
-function handleTransfer(
-    ctx: Ctx,
-    block: EvmBlock,
-    item: LogItem<{evmLog: {topics: true; data: true}; transaction: {hash: true}}>
-): TransferEventData {
+function getTransfer(item: LogItem<{evmLog: {topics: true; data: true}}>): Transfer {
     let event = erc20.events.Transfer.decode(item.evmLog)
-    return {
+
+    let spender = event.from.toLowerCase()
+    let receiver = event.to.toLowerCase()
+    let amount = event.value.toBigInt()
+
+    return new Transfer({
         id: item.evmLog.id,
-        blockNumber: block.height,
-        timestamp: new Date(block.timestamp),
-        txHash: item.transaction.hash,
-        from: event.from.toLowerCase(),
-        to: event.to.toLowerCase(),
-        amount: event.value.toBigInt(),
-    }
+        spender,
+        receiver,
+        amount
+    })
 }
 
-function getAccount(m: Map<string, Account>, id: string): Account {
-    let acc = m.get(id)
-    if (acc == null) {
-        acc = new Account()
-        acc.id = id
-        m.set(id, acc)
-    }
-    return acc
+
+function getApproval(item: LogItem<{evmLog: {topics: true; data: true}}>): Approval {
+    let event = erc20.events.Approval.decode(item.evmLog)
+
+    let owner = event.owner.toLowerCase()
+    let spender = event.spender.toLowerCase()
+    let value = event.value.toBigInt()
+
+    return new Approval({
+        id: item.evmLog.id,
+        owner,
+        spender,
+        value
+    })
 }
+
+
+
