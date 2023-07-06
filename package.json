@@ -10,7 +10,7 @@
     "@subsquid/archive-registry": "~2.1.4",
     "@subsquid/evm-processor": "^1.0.0",
     "@subsquid/evm-typegen": "^2.0.4",
-    "@subsquid/graphql-server": "^3.3.2",
+    "@subsquid/graphql-server": "^4.0.0",
     "@subsquid/typeorm-migration": "^0.1.6",
     "@subsquid/typeorm-store": "^0.2.2",
     "dotenv": "^16.0.3",
